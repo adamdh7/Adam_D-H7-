@@ -1,9 +1,8 @@
 
-
 {
   "name": "adam-dh7",
   "version": "1.0.0",
-  "description": "Adam_D'H7 WhatsApp bot",
+  "description": "Bot Adam_D'H7 - WhatsApp AI",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
