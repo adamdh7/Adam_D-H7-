@@ -1,16 +1,18 @@
 // ── Polyfills for Node.js (must be at the very top) ──────────────────────
-global.WebSocket = require('ws');
-global.fetch     = require('node-fetch');
-
-// ── Imports ───────────────────────────────────────────────────────────────
-const pino = require('pino');
-const QRCode = require('qrcode');
-const {
-  default: makeWASocket,
+import ws from 'ws';
+import fetch from 'node-fetch';
+import pino from 'pino';
+import QRCode from 'qrcode';
+import {
+  default as makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason
-} = require('baileys');
+} from 'baileys';
+
+// Global polyfills
+global.WebSocket = ws;
+global.fetch = fetch;
 
 // ── Utility ────────────────────────────────────────────────────────────────
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -206,4 +208,3 @@ async function startSock() {
 }
 
 startSock();
-
