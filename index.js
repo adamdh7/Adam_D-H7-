@@ -1,10 +1,9 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
-import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
-import fetch from 'node-fetch' // ✅ ESM-compatible
+import fetch from 'node-fetch'
 
-global.fetch = fetch // facultatif, si tu utilises fetch plus loin
+global.fetch = fetch
 
 async function startSock() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
@@ -25,7 +24,8 @@ async function startSock() {
     }
 
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+      const statusCode = lastDisconnect?.error?.output?.statusCode
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut
       console.log('❌ Déconnecté. Reconnexion :', shouldReconnect)
       if (shouldReconnect) startSock()
     } else if (connection === 'open') {
