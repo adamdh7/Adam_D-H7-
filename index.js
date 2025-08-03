@@ -1,4 +1,5 @@
-import makeWASocket, {
+import {
+  makeWASocket,
   useMultiFileAuthState,
   DisconnectReason
 } from '@whiskeysockets/baileys'
@@ -6,7 +7,6 @@ import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import fetch from 'node-fetch'
 
-// Pour les anciennes dépendances utilisant global.fetch
 if (!global.fetch) global.fetch = fetch
 
 async function startSock() {
@@ -14,8 +14,8 @@ async function startSock() {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true,
-    logger: pino({ level: 'silent' })
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: true
   })
 
   sock.ev.on('creds.update', saveCreds)
@@ -24,12 +24,15 @@ async function startSock() {
     if (qr) {
       qrcode.generate(qr, { small: true })
     }
+
     if (connection === 'close') {
       const shouldReconnect =
         (lastDisconnect?.error?.output?.statusCode ?? 0) !== DisconnectReason.loggedOut
       console.log('🛑 Connexion fermée. Reconnexion :', shouldReconnect)
       if (shouldReconnect) startSock()
-    } else if (connection === 'open') {
+    }
+
+    if (connection === 'open') {
       console.log('✅ Connecté à WhatsApp')
     }
   })
@@ -37,7 +40,7 @@ async function startSock() {
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0]
     if (!msg.message) return
-    console.log('📨 Nouveau message reçu :', msg.key.remoteJid)
+    console.log('📨 Message reçu de :', msg.key.remoteJid)
   })
 }
 
