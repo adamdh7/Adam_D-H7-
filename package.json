@@ -1,18 +1,14 @@
 {
   "name": "home",
   "version": "1.0.0",
-  "description": "",
+  "description": "Bot WhatsApp + Telegram IA",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
-    "@hapi/boom": "^10.0.1",
     "node-fetch": "^3.3.2",
     "pino": "^9.7.0",
     "qr": "^0.5.0",
