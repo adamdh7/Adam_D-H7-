@@ -1,84 +1,58 @@
-import makeWASocket, {
-  DisconnectReason,
-  useMultiFileAuthState,
-  makeInMemoryStore,
-  fetchLatestBaileysVersion,
-  jidNormalizedUser,
-} from '@whiskeysockets/baileys';
-import Pino from 'pino';
-import { Boom } from '@hapi/boom';
-import qrcode from 'qrcode-terminal';
-import fetch from 'node-fetch'; // node-fetch v3 compatible (ESM)
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const fs = require('fs');
+import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import pino from 'pino';
+import QRCode from 'qrcode-terminal';
+import { Telegraf } from 'telegraf';
+import fetch from 'node-fetch';
 
-// Store logs
-const store = makeInMemoryStore({ logger: Pino().child({ level: 'silent', stream: 'store' }) });
+const botToken = 'TON_TOKEN_TELEGRAM_ICI'; // remplace par ton vrai token Telegram
+const bot = new Telegraf(botToken);
 
-const start = async () => {
+bot.start((ctx) => ctx.reply('🤖 Bot en ligne ! Envoie-moi un message, je vais te répondre.'));
+bot.on('text', async (ctx) => {
+  const message = ctx.message.text;
+  const res = await fetch(`https://api.chucknorris.io/jokes/random`);
+  const data = await res.json();
+  await ctx.reply(`Tu m'as dit : ${message}\n🤣 Blague : ${data.value}`);
+});
+
+bot.launch().then(() => console.log('✅ Bot Telegram lancé !'));
+
+const startBaileys = async () => {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-
-  console.log(`💡 Baileys version: ${version.join('.')}, latest: ${isLatest}`);
+  const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
     printQRInTerminal: true,
     auth: state,
-    logger: Pino({ level: 'silent' }),
-    browser: ['TF-Big deal', 'Safari', '1.0.0'],
-    syncFullHistory: false,
-    generateHighQualityLinkPreview: true,
-    getMessage: async (key) => ({
-      conversation: '📥 Message non trouvé',
-    }),
+    logger: pino({ level: 'silent' }),
   });
-
-  store.bind(sock.ev);
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      qrcode.generate(qr, { small: true });
-    }
-
+    const { connection, lastDisconnect } = update;
     if (connection === 'close') {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log('🔌 Déconnexion - Raison:', reason);
-      if (reason === DisconnectReason.loggedOut) {
-        console.log('🔒 Déconnecté. Veuillez scanner à nouveau le QR code.');
-        start(); // relance
+      const reason = lastDisconnect?.error?.output?.statusCode;
+      if (reason !== DisconnectReason.loggedOut) {
+        console.log('📴 Déconnecté, reconnexion...');
+        startBaileys();
+      } else {
+        console.log('❌ Déconnecté définitivement.');
       }
-    }
-
-    if (connection === 'open') {
-      console.log('✅ Connecté avec succès à WhatsApp!');
+    } else if (connection === 'open') {
+      console.log('✅ Connecté à WhatsApp !');
     }
   });
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
     const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+    if (!text) return;
 
-    const sender = jidNormalizedUser(msg.key.remoteJid);
-    const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-
-    console.log(`📩 Message de ${sender}: ${body}`);
-
-    if (body === '.ping') {
-      await sock.sendMessage(sender, { text: '🏓 Pong!' });
-    }
-
-    if (body === '.menu') {
-      await sock.sendMessage(sender, {
-        text: '📋 *Menu TF-Bot*\n\n• .ping\n• .menu\n• .qr\n• .spam\n• .bug\n• .code\n• .papa',
-      });
-    }
+    await sock.sendMessage(msg.key.remoteJid, { text: `📩 Reçu : ${text}` });
   });
 };
 
-start();
+startBaileys().catch((err) => console.error('Erreur WhatsApp:', err));
