@@ -1,40 +1,43 @@
-import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason
+} from '@whiskeysockets/baileys'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import fetch from 'node-fetch'
 
-global.fetch = fetch
+// Pour les anciennes dépendances utilisant global.fetch
+if (!global.fetch) global.fetch = fetch
 
 async function startSock() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
+  const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
 
   const sock = makeWASocket({
+    auth: state,
     printQRInTerminal: true,
-    logger: pino({ level: 'silent' }),
-    auth: state
+    logger: pino({ level: 'silent' })
   })
 
   sock.ev.on('creds.update', saveCreds)
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update
-
+  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) {
       qrcode.generate(qr, { small: true })
     }
-
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut
-      console.log('❌ Déconnecté. Reconnexion :', shouldReconnect)
+      const shouldReconnect =
+        (lastDisconnect?.error?.output?.statusCode ?? 0) !== DisconnectReason.loggedOut
+      console.log('🛑 Connexion fermée. Reconnexion :', shouldReconnect)
       if (shouldReconnect) startSock()
     } else if (connection === 'open') {
       console.log('✅ Connecté à WhatsApp')
     }
   })
 
-  sock.ev.on('messages.upsert', async (msg) => {
-    console.log('📩 Nouveau message :', JSON.stringify(msg, null, 2))
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0]
+    if (!msg.message) return
+    console.log('📨 Nouveau message reçu :', msg.key.remoteJid)
   })
 }
 
