@@ -1,6 +1,5 @@
-import makeWASocket from '@whiskeysockets/baileys'
-import { Boom } from '@hapi/boom'
-import { default as qrcodeTerminal } from 'qrcode-terminal'
+import { makeWASocket, DisconnectReason } from '@whiskeysockets/baileys'
+import * as qrcode from 'qrcode-terminal'
 
 async function startSock() {
   const sock = makeWASocket({
@@ -9,25 +8,28 @@ async function startSock() {
 
   sock.ev.on('connection.update', (update) => {
     const { connection, qr, lastDisconnect } = update
+
     if (qr) {
-      qrcodeTerminal.generate(qr, { small: true })
-      console.log('QR code généré, scanne-le avec WhatsApp.')
+      console.log('QR code reçu, génère et affiche dans le terminal :')
+      qrcode.generate(qr, { small: true })
     }
+
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== Boom.statusCodes.loggedOut
-      console.log('Connexion fermée, reconnecte ? ', shouldReconnect)
-      if (shouldReconnect) {
-        startSock()
+      const statusCode = lastDisconnect?.error?.output?.statusCode
+      if (statusCode === DisconnectReason.loggedOut) {
+        console.log('Déconnecté car déconnexion de WhatsApp (401), veuillez reconnecter manuellement.')
       } else {
-        console.log('Déconnecté définitivement')
+        console.log('Connexion fermée, tentative de reconnexion...')
+        startSock()
       }
     } else if (connection === 'open') {
       console.log('Connecté avec succès ✅')
     }
   })
 
-  sock.ev.on('messages.upsert', ({ messages }) => {
+  sock.ev.on('messages.upsert', ({ messages, type }) => {
     console.log('Nouveaux messages reçus:', messages)
+    // Tu peux ajouter ici la gestion des messages
   })
 }
 
