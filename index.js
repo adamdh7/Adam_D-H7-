@@ -1,39 +1,38 @@
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import pino from 'pino'
+import qrcode from 'qrcode-terminal'
 
-import { makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
-import * as qrcode from 'qrcode-terminal'
-import * as fs from 'fs'
-
-// Fonction principale
 async function startSock() {
-  const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
-
+  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
   const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: true
+    printQRInTerminal: true,
+    logger: pino({ level: 'silent' }),
+    auth: state
   })
 
   sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      qrcode.generate(qr, { small: true })
+    }
+
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode
-      if (statusCode === DisconnectReason.loggedOut) {
-        console.log('❌ Déconnecté définitivement. Supprimez ./auth_info pour re-générer un QR code.')
-      } else {
-        console.log('🔁 Reconnexion...')
+      const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut
+      console.log('Connexion fermée. Reconnexion:', shouldReconnect)
+      if (shouldReconnect) {
         startSock()
       }
     } else if (connection === 'open') {
-      console.log('✅ Connecté à WhatsApp Web.')
+      console.log('✅ Connecté à WhatsApp Web')
     }
   })
 
-  sock.ev.on('messages.upsert', ({ messages }) => {
-    const msg = messages[0]
-    if (!msg.key.fromMe && msg.message) {
-      console.log('📩 Message reçu:', msg.message)
-    }
+  sock.ev.on('messages.upsert', async (msg) => {
+    console.log('📩 Nouveau message reçu:', JSON.stringify(msg, null, 2))
   })
 }
 
