@@ -2,9 +2,13 @@ import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeys
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
+import fetch from 'node-fetch' // ✅ ESM-compatible
+
+global.fetch = fetch // facultatif, si tu utilises fetch plus loin
 
 async function startSock() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
+
   const sock = makeWASocket({
     printQRInTerminal: true,
     logger: pino({ level: 'silent' }),
@@ -21,18 +25,16 @@ async function startSock() {
     }
 
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut
-      console.log('Connexion fermée. Reconnexion:', shouldReconnect)
-      if (shouldReconnect) {
-        startSock()
-      }
+      const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+      console.log('❌ Déconnecté. Reconnexion :', shouldReconnect)
+      if (shouldReconnect) startSock()
     } else if (connection === 'open') {
-      console.log('✅ Connecté à WhatsApp Web')
+      console.log('✅ Connecté à WhatsApp')
     }
   })
 
   sock.ev.on('messages.upsert', async (msg) => {
-    console.log('📩 Nouveau message reçu:', JSON.stringify(msg, null, 2))
+    console.log('📩 Nouveau message :', JSON.stringify(msg, null, 2))
   })
 }
 
