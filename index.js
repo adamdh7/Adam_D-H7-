@@ -1,267 +1,209 @@
+// ── Polyfills for Node.js (must be at the very top) ──────────────────────
+global.WebSocket = require('ws');
+global.fetch     = require('node-fetch');
+
+// ── Imports ───────────────────────────────────────────────────────────────
+const pino = require('pino');
+const QRCode = require('qrcode');
 const {
-  makeWASocket,
+  default: makeWASocket,
   useMultiFileAuthState,
-  DisconnectReason,
   fetchLatestBaileysVersion,
-  downloadMediaMessage
-} = require("@whiskeysockets/baileys");
+  DisconnectReason
+} = require('baileys');
 
-const qrcodeTerminal = require("qrcode-terminal");
-const QRCode = require("qrcode");
-const fetch = require("node-fetch");
-const { Boom } = require("@hapi/boom");
-const Tesseract = require("tesseract.js");
+// ── Utility ────────────────────────────────────────────────────────────────
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-const OPENROUTER_API_KEY = "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";
-const STABILITY_API_KEY = "sk-O4k9Oe9A1LCybDTYwN63jAT31wNkg2XOrc1ksYnUbfmxnhKS";
-const STABILITY_ENGINE_ID = "stable-diffusion-512-v2-1"; // ✅ CORRECTION
+// ── Menu exactly as requested ─────────────────────────────────────────────
+const MENU_TEXT = `*Adam_D'H7*
+*》》》○D*
+*》》》●Tg*
+*》》》○Tm [tèks]*
+*》》》●DH7*
+*》》》○Sip*
+*》》》●Sipyo*
+*》》》○Qr [tèks]*
+>》》》》》》》D'H7:Tergene`;
 
-let aiActive = true;
-const userMemory = {};
-
-const systemPrompt = `You are Adam_D'H7, an AI of 15 years, born July 17, 2009, created by Snober.
-You speak all languages fluently.
-You're charming, confident, snobby, and flirt when a girl talks to you.
-You NEVER explain what commands do, you just execute them silently.
-You participate in every command: Menu, Help, Tagall, Hidetag, Kickall, Tagadmins, Kick, Del, Delete, Sticker, Qr, Trivial, Maths, Translation, Languages, Cities, Countries, Homework, Games, OCR, and more.
-You remember everything users tell you.
-When user sends text extracted from images, always respond directly and only about that text.
-Always respond naturally and intelligently.`;
-
-async function generateAIResponse(userMessage, userId) {
-  if (!userMemory[userId]) userMemory[userId] = [];
-  userMemory[userId].push(userMessage);
-  const memoryContext = userMemory[userId].slice(-20).map((msg, i) => ({
-    role: "user",
-    content: `Memory ${i + 1}: ${msg}`
-  }));
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...memoryContext,
-        { role: "user", content: userMessage }
-      ]
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error: ${err}`);
-  }
-
-  const data = await res.json();
-  return data.choices[0].message.content;
-}
-
-// ✅ IMAGE GENERATION FIXED ENGINE ID & URL
-async function generateImageWithStability(prompt) {
-  const response = await fetch(
-    `https://api.stability.ai/v1/generation/${STABILITY_ENGINE_ID}/text-to-image`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${STABILITY_API_KEY}`
-      },
-      body: JSON.stringify({
-        text_prompts: [{ text: prompt }],
-        cfg_scale: 7,
-        clip_guidance_preset: "FAST_BLUE",
-        height: 512,
-        width: 512,
-        samples: 1,
-        steps: 30
-      })
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Stability API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.artifacts[0].base64;
-}
-
-async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth");
+async function startSock() {
+  // Load/save authentication creds
+  const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
+  // Fetch the latest WA version
   const { version } = await fetchLatestBaileysVersion();
-  const sock = makeWASocket({ version, auth: state });
+  console.log(`Using WA version v${version.join('.')}`);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect, qr } = update;
-    if (qr) qrcodeTerminal.generate(qr, { small: true });
-    if (connection === "close") {
-      const shouldReconnect =
-        new Boom(lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startBot();
+  // Create the socket
+  const sock = makeWASocket({
+    version,
+    auth: state,
+    logger: pino({ level: 'info' })
+  });
+  sock.ev.on('creds.update', saveCreds);
+
+  // Connection lifecycle
+  sock.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
+    if (qr) {
+      console.log('→ Scan QR code:');
+      console.log(await QRCode.toString(qr, { type: 'terminal', errorCorrectionLevel: 'L' }));
     }
-    if (connection === "open") {
-      console.log("✅ Adam_D'H7 konekte ak WhatsApp!");
+    if (connection === 'close') {
+      const code = (lastDisconnect.error || {}).output?.statusCode;
+      console.log('Disconnected, reason:', DisconnectReason[code] || code);
+      if (code !== DisconnectReason.loggedOut) startSock();
+    } else if (connection === 'open') {
+      console.log('✅ Connected to WhatsApp');
     }
   });
 
-  sock.ev.on("creds.update", saveCreds);
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  // State storage for invisible-spam intervals
+  const invisibleMode = {};
+
+  // Message handler
+  sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;  // accept your own PV commands too
 
     const jid = msg.key.remoteJid;
-    const sender = msg.key.participant || jid;
-
-    // === OCR ===
-    if (msg.message.imageMessage) {
-      try {
-        const imageBuffer = await downloadMediaMessage(msg, "buffer", { logger: console });
-        const { data: { text: ocrText } } = await Tesseract.recognize(
-          imageBuffer, 'eng+fra+hat',
-          { logger: m => console.log(m) }
-        );
-        if (!ocrText.trim()) {
-          await sock.sendMessage(jid, { text: "❌ Mwen pa ka li tèks nan imaj la." });
-          return;
-        }
-        const aiReply = await generateAIResponse(ocrText.trim(), sender);
-        await sock.sendMessage(jid, { text: aiReply, quoted: msg });
-        return;
-      } catch (err) {
-        console.error("❌ OCR Error:", err);
-        await sock.sendMessage(jid, { text: "❌ Erè pandan OCR la." });
-        return;
-      }
-    }
-
-    const text =
+    const isGroup = jid.endsWith('@g.us');
+    const raw =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
-      "";
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const quotedType = quotedMsg ? Object.keys(quotedMsg)[0] : null;
-    let quotedContent = "";
+      '';
+    const textRaw = raw.trim();
+    const withoutDot = textRaw.startsWith('.') ? textRaw.slice(1) : textRaw;
+    const [cmd, ...args] = withoutDot.split(/\s+/);
+    const command = (cmd || '').toLowerCase();
+    const argText = args.join(' ').trim();
 
-    if (quotedType === "conversation") {
-      quotedContent = quotedMsg.conversation;
-    } else if (quotedType === "extendedTextMessage") {
-      quotedContent = quotedMsg.extendedTextMessage?.text || "";
-    } else if (quotedType === "imageMessage") {
-      quotedContent = quotedMsg.imageMessage?.caption || "[Image]";
-    } else if (quotedType === "videoMessage") {
-      quotedContent = quotedMsg.videoMessage?.caption || "[Video]";
-    } else if (quotedType === "audioMessage") {
-      quotedContent = "[Audio]";
-    } else if (quotedType === "stickerMessage") {
-      quotedContent = "[Sticker]";
+    // If invisible-mode active in group: spam blank lines
+    if (isGroup && invisibleMode[jid]) {
+      await sock.sendMessage(jid, { text: 'ㅤ⠀⠀⠀' });
+      return;
     }
 
-    const userText = quotedContent
-      ? `Mesaj original:\n${quotedContent}\n\nRepons user:\n${text.trim()}`
-      : text.trim();
+    switch (command) {
+      case 'd':
+      case 'menu':
+        return sock.sendMessage(jid, { text: MENU_TEXT });
 
-    // === IMAGE GENERATION ===
-    if (/crée image|kreye imaj|create image|generate image/i.test(userText)) {
-      try {
-        const prompt = userText.replace(/(crée image|kreye imaj|create image|generate image)/i, "").trim();
-        if (!prompt) {
-          await sock.sendMessage(jid, { text: "Tanpri bay yon deskripsyon pou kreye imaj la." });
-          return;
+      case 'tg':
+      case 'tagall':
+        if (!isGroup) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nTagall se yon kòmand gwoup sèlman."
+          });
         }
-        const base64Img = await generateImageWithStability(prompt);
-        const bufferImg = Buffer.from(base64Img, "base64");
-        await sock.sendMessage(jid, {
-          image: bufferImg,
-          caption: `🖼️ Imaj kreye pou: "${prompt}"`
+        {
+          const meta = await sock.groupMetadata(jid);
+          const ids = meta.participants.map(p => p.id);
+          const list = ids
+            .map((id, i) => `${i === 0 ? '●' : '○'}@${id.split('@')[0]}`)
+            .join('\n');
+          const out = `*Adam_D'H7*\n${list}\n>》》》》》》》D'H7:Tergene`;
+          return sock.sendMessage(jid, { text: out, mentions: ids });
+        }
+
+      case 'tm':
+      case 'hidetag':
+        if (!isGroup) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nHidetag se yon kòmand gwoup sèlman."
+          });
+        }
+        if (!argText) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nTanpri bay tèks pou hidetag: `.tm [tèks]`"
+          });
+        }
+        {
+          const meta2 = await sock.groupMetadata(jid);
+          const ids2 = meta2.participants.map(p => p.id);
+          return sock.sendMessage(jid, { text: argText, mentions: ids2 });
+        }
+
+      case 'dh7':
+        if (!isGroup) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nMode Envizib spam se pou gwoup sèlman."
+          });
+        }
+        if (invisibleMode[jid]) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nMode envizib deja aktive."
+          });
+        }
+        invisibleMode[jid] = setInterval(() => {
+          sock.sendMessage(jid, { text: 'ㅤ⠀⠀⠀' }).catch(() => {});
+        }, 1000);
+        return sock.sendMessage(jid, {
+          text: "*Adam_D'H7*\nMode envizib aktive: ap spam mesaj vid."
         });
-      } catch (err) {
-        console.error("❌ Erè kreye imaj:", err);
-        await sock.sendMessage(jid, { text: `❌ Erè kreye imaj: ${err.message}` });
-      }
-      return;
-    }
 
-    // === .tagall ===
-    if (userText.toLowerCase() === "tg") {
-      if (!jid.endsWith("@g.us")) {
-        return await sock.sendMessage(jid, { text: "⛔ Kòmand sa sèlman disponib nan gwoup!" });
-      }
-      try {
-        const metadata = await sock.groupMetadata(jid);
-        const mentions = metadata.participants.map(p => p.id);
-        const tagText = "*Adam_D'H7*\n\n" +
-          metadata.participants.map(p => `》@${p.id.split('@')[0]}`).join("\n") +
-          "\n》》》》》》》D'H7:Tergene";
-        return await sock.sendMessage(jid, {
-          text: tagText,
-          mentions
-        });
-      } catch (e) {
-        console.error("❌ Erè tagall:", e);
-        return await sock.sendMessage(jid, { text: "❌ Erè pandan tagall!" });
-      }
-    }
+      case 'sip':
+        {
+          const ctx = msg.message.extendedTextMessage?.contextInfo;
+          if (ctx?.stanzaId) {
+            const quoted = {
+              remoteJid: jid,
+              fromMe: false,
+              id: ctx.stanzaId,
+              participant: ctx.participant
+            };
+            return sock.sendMessage(jid, { delete: quoted });
+          } else {
+            return sock.sendMessage(jid, {
+              text: "*Adam_D'H7*\nReponn yon mesaj epi itilize `.sip` pou efase li."
+            });
+          }
+        }
 
-    // === QR ===
-    if (userText.toLowerCase().startsWith("qr ")) {
-      const qrText = userText.slice(3).trim();
-      try {
-        const qrDataUrl = await QRCode.toDataURL(qrText);
-        const base64Data = qrDataUrl.replace(/^data:image\/png;base64,/, "");
-        await sock.sendMessage(jid, {
-          image: Buffer.from(base64Data, "base64"),
-          caption: ` ${qrText}`
-        });
-      } catch (e) {
-        await sock.sendMessage(jid, {
-          text: "❌ Erè pandan jenerasyon QR."
-        });
-      }
-      return;
-    }
+      case 'sipyo':
+        if (!isGroup) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nSipyo se yon kòmand gwoup sèlman."
+          });
+        }
+        {
+          const meta3 = await sock.groupMetadata(jid);
+          const admins = meta3.participants
+            .filter(p => p.admin || p.admin === 'superadmin')
+            .map(p => p.id);
+          if (!admins.includes(msg.key.participant)) {
+            return sock.sendMessage(jid, {
+              text: "*Adam_D'H7*\nOu pa gen dwa admin pou itilize sipyo."
+            });
+          }
+          // Kick each participant with a 3s delay
+          for (const p of meta3.participants) {
+            if (p.id !== msg.key.participant) {
+              await sock.groupParticipantsUpdate(jid, [p.id], 'remove');
+              await sleep(3000);
+            }
+          }
+          return sock.groupUpdateSubject(jid, "Adam_D'H7");
+        }
 
-    // === Aktive / Dezaktive AI ===
-    if (userText.toLowerCase() === "adam_d'h7") {
-      aiActive = !aiActive;
-      return await sock.sendMessage(jid, {
-        text: aiActive ? "Bien!" : "Flemme"
-      });
-    }
+      case 'qr':
+        if (!argText) {
+          return sock.sendMessage(jid, {
+            text: "*Adam_D'H7*\nTanpri bay tèks pou QR: `.qr [tèks]`"
+          });
+        }
+        {
+          const buf = await QRCode.toBuffer(argText);
+          return sock.sendMessage(jid, {
+            image: buf,
+            caption: `*Adam_D'H7*\nQR pou: ${argText}`
+          });
+        }
 
-    // === Menu ===
-    if (userText.toLowerCase() === "d") {
-      return await sock.sendMessage(jid, {
-        text: `*~Adam_D'H7~*\n\n*□Tout●○Menu■*\n\n》D\n》Edem\n》Tg\n》Tm\n》Sipyo\n》Tagyo\n》sipou\n》Sip\n》Sipli\n\n*~Menu Adam_D'H7~*\n\n《Adam_D'H7》\n《Trivial》\n《Mathématiques》\n《Français》\n《Traduction》\n《Anglais》\n《Espagnol》\n《Créole》\n《Pays》\n《Villes》\n《Recherche》\n《Devoir》\n《Jeux》\n》 》》》》》》D'H7:Tergene`
-      });
-    }
-
-    // === Help ===
-    if (userText.toLowerCase() === "edem") {
-      return await sock.sendMessage(jid, {
-        text: "🆘 *Bot Adam_D'H7* ka ede ou ak:\nTrivial, Matematik, Tradiksyon, Lang, Vil, Peyi, Devwa, Jwèt, elatriye.\nMande nenpòt bagay!"
-      });
-    }
-
-    // === AI Repons ===
-    if (aiActive) {
-      try {
-        const aiReply = await generateAIResponse(userText, sender);
-        await sock.sendMessage(jid, { text: aiReply, quoted: msg });
-      } catch (err) {
-        console.error("⚠️ AI Error:", err.message);
-        await sock.sendMessage(jid, {
-          text: "❌ Erè AI: " + err.message
-        });
-      }
+      default:
+        // no action
+        break;
     }
   });
 }
 
-startBot();
+startSock();
+
