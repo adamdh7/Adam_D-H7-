@@ -1,58 +1,76 @@
-import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState } from '@whiskeysockets/baileys';
-import pino from 'pino';
-import QRCode from 'qrcode-terminal';
-import { Telegraf } from 'telegraf';
-import fetch from 'node-fetch';
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  makeInMemoryStore
+} from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import Pino from 'pino'
+import qrcode from 'qrcode-terminal'
+import { join } from 'path'
 
-const botToken = 'TON_TOKEN_TELEGRAM_ICI'; // remplace par ton vrai token Telegram
-const bot = new Telegraf(botToken);
+const logger = Pino({ level: 'silent' })
+const store = makeInMemoryStore({ logger })
 
-bot.start((ctx) => ctx.reply('🤖 Bot en ligne ! Envoie-moi un message, je vais te répondre.'));
-bot.on('text', async (ctx) => {
-  const message = ctx.message.text;
-  const res = await fetch(`https://api.chucknorris.io/jokes/random`);
-  const data = await res.json();
-  await ctx.reply(`Tu m'as dit : ${message}\n🤣 Blague : ${data.value}`);
-});
-
-bot.launch().then(() => console.log('✅ Bot Telegram lancé !'));
-
-const startBaileys = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-  const { version } = await fetchLatestBaileysVersion();
+const startSock = async () => {
+  const { state, saveCreds } = await useMultiFileAuthState('auth_info')
+  const { version } = await fetchLatestBaileysVersion()
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: true,
-    auth: state,
-    logger: pino({ level: 'silent' }),
-  });
+    logger,
+    printQRInTerminal: false,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    msgRetryCounterMap: {},
+    generateHighQualityLinkPreview: true,
+    getMessage: async () => ({ conversation: 'Hi' })
+  })
 
-  sock.ev.on('creds.update', saveCreds);
+  store.bind(sock.ev)
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      qrcode.generate(qr, { small: true })
+      console.log("📱 Scanne QR code nan pou konekte WhatsApp bot la.")
+    }
+
     if (connection === 'close') {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      if (reason !== DisconnectReason.loggedOut) {
-        console.log('📴 Déconnecté, reconnexion...');
-        startBaileys();
+      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
+      if (reason === DisconnectReason.loggedOut) {
+        console.log('❌ Logout. Reconnect...')
+        startSock()
       } else {
-        console.log('❌ Déconnecté définitivement.');
+        console.log('🔁 Connection closed. Reconnecting...')
+        startSock()
       }
     } else if (connection === 'open') {
-      console.log('✅ Connecté à WhatsApp !');
+      console.log('✅ Bot WhatsApp konekte ak siksè !')
     }
-  });
+  })
+
+  sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    const msg = messages[0];
-    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-    if (!text) return;
+    const msg = messages[0]
+    if (!msg.message || msg.key.fromMe) return
 
-    await sock.sendMessage(msg.key.remoteJid, { text: `📩 Reçu : ${text}` });
-  });
-};
+    const from = msg.key.remoteJid
+    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || ''
 
-startBaileys().catch((err) => console.error('Erreur WhatsApp:', err));
+    if (text.toLowerCase() === 'bonjour') {
+      await sock.sendMessage(from, { text: '👋 Bonjou, kijan ou ye?' })
+    }
+
+    if (text.toLowerCase() === '.menu') {
+      await sock.sendMessage(from, { text: '📜 Men meni bot la:\n.bonjour\n.menu' })
+    }
+  })
+}
+
+startSock()
