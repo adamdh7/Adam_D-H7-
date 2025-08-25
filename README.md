@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/djalega8000/Zokou-MD/refs/heads/main/Ephoto360.com_164cb282992914.jpg" alt="Bannière Zokou" width="600">
+  <img src="https://res.cloudinary.com/dckwrqrur/image/upload/v1756093986/tf-stream-url/Screenshot_20250328_182435_Gallery_z774ui.jpg" alt="Adam_D'H7" width="600">
   <h1 align="center">Adam_D'H7</h1>
   <p align="center">
     <img src="https://res.cloudinary.com/dckwrqrur/image/upload/v1756090421/tf-stream-url/ca4b46bf6d3b54cefd2a68765ea84299_0_kglasx.jpg" alt="Multi-devices">
