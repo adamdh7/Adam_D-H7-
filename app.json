@@ -1,14 +1,14 @@
 {
-  "name": "Zokou-2.0",
-  "description": "bot whatsapp développé par djalega++",
+  "name": "Adam_D'H7",
+  "description": "bot whatsapp développé par Adam_D'H7",
   "keywords": [
     "bot",
     "node",
     "baileys",
     "whatsapp"
   ],
-  "logo": "https://raw.githubusercontent.com/djalega8000/Zokou-2.0/main/Zokou.jpg",
-  "repository": "https://github.com/djalega8000/Zokou-2.0",
+  "logo": "https://res.cloudinary.com/dckwrqrur/image/upload/v1756090201/tf-stream-url/IMG-20250722-WA0021_ojuslt.jpg",
+  "repository": "https://github.com/adamdh7/Adam_D-H7-",
   "succes_url": "/",
   "stack": "container",
   "env": {
@@ -29,7 +29,7 @@
     },
     "BOT_NAME": {
       "description": "Un nom pour votre bot",
-      "value": "Zokou-MD",
+      "value": "Adam_D'H7",
       "required": false
     },
     "MENU_THEME": {
@@ -68,12 +68,12 @@
     "OWNER_NAME": {
       "description": "Votre nom",
       "required": false,
-      "value": "Djalega++"
+      "value": "Adam_D'H7"
     },
     "OWNER_NUMBER": {
       "description": "Votre numero de telephone; il doit etre dans le format ID+numero",
       "required": false,
-      "value": "22891733300"
+      "value": "50942292687"
     },
     "WARN_COUNT": {
       "description": "il s'agit de nombre d'avertissement limite",
@@ -123,7 +123,7 @@
     "STICKER_PACKNAME": {
       "description": "Nom du pack de stickers",
       "required": false,
-      "value": "made with ❤; Zokou-MD"
+      "value": "Adam_D'H7"
     }
   },
   "formation": {

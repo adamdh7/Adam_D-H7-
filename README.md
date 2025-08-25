@@ -1,10 +1,10 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/djalega8000/Zokou-MD/refs/heads/main/Ephoto360.com_164cb282992914.jpg" alt="Bannière Zokou" width="600">
-  <h1 align="center">Zokou-MD 3.0</h1>
+  <h1 align="center">Adam_D'H7</h1>
   <p align="center">
-    <img src="https://img.shields.io/badge/Multi_Devices-100%25-success?style=flat&logo=whatsapp" alt="Multi-devices">
-    <img src="https://img.shields.io/badge/Version-3.0-blue?style=flat&logo=github" alt="Version">
-    <img src="https://img.shields.io/badge/Licence-MIT-green?style=flat&logo=opensourceinitiative" alt="Licence">
+    <img src="https://res.cloudinary.com/dckwrqrur/image/upload/v1756090421/tf-stream-url/ca4b46bf6d3b54cefd2a68765ea84299_0_kglasx.jpg" alt="Multi-devices">
+    <img src="https://res.cloudinary.com/dckwrqrur/video/upload/v1756090767/tf-stream-url/VID-20250824-WA0993_a6eesn.mp4" alt="Version">
+    <img src="https://res.cloudinary.com/dckwrqrur/image/upload/v1756090201/tf-stream-url/IMG-20250722-WA0021_ojuslt.jpg" alt="Licence">
   </p>
 </p>
 
@@ -17,7 +17,7 @@
 
 ---
 
-## 🌟 Pourquoi choisir Zokou-MD ?
+## 🌟 Pourquoi choisir Adam_D'H7?
 
 | Fonctionnalité | Description |
 |---------------|-------------|
@@ -28,13 +28,6 @@
 ---
 
 ## 🚀 Déploiement
-
-### 1. Hébergement Cloud (Heroku)
-
-Déployez instantanément sur Heroku :
-
-[![Deploy on Heroku](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/luffy8979/Zokou-MD-French)
-
 ---
 
 ### 2. Hébergement Panel
